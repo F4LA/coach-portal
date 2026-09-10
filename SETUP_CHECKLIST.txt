@@ -2,60 +2,41 @@ COACH PORTAL — CHECKLIST DE ARRANQUE
 Proyecto separado de affiliate-portal: Supabase propio, repo propio, dominio propio.
 
 =====================================================
-1. SUPABASE — proyecto nuevo
+YA RESUELTO
 =====================================================
-[x] Crear un proyecto NUEVO en supabase.com — se llama "coach-portal"
-[x] Copiar Project URL, anon key, service_role key a .env.local
-[x] Correr supabase/schema.sql (tabla "coach" creada y confirmada)
+[x] Supabase: proyecto "coach-portal", tabla "coach", .env.local
+[x] Supabase Auth: Site URL + Redirect URLs apuntando a
+    https://coachportal.strongstandard.com
+[x] Google login activado (mismo cliente OAuth de affiliate-portal,
+    redirect URI nueva agregada) — probado, funciona
+[x] GitHub: F4LA/coach-portal
+[x] Vercel: deploy conectado y confirmado en producción
+[x] Dominio: coachportal.strongstandard.com — probado en vivo
+[x] Roster real probado (Bernardo, 43 clientes, matemática de meses
+    pagados correcta)
+[x] Signup público ELIMINADO — ya no existe /signup ni forma de
+    auto-asignarse un nombre de coach. Si alguien entra (email o
+    Google) y no tiene cuenta creada por un admin, ve un mensaje de
+    "no coach account yet, contact an admin" y no puede ver nada.
 
 =====================================================
-2. SUPABASE AUTH — configuración
+PENDIENTE — CREAR LAS 6 CUENTAS REALES
 =====================================================
-[x] Authentication > URL Configuration — hecho vía API con el
-    Personal Access Token:
-      - Site URL: https://coachportal.strongstandard.com
-      - Redirect URLs: https://coachportal.strongstandard.com/**
-[ ] Google login (opcional, pero ya lo tiene affiliate-portal):
-      - Puedes reusar el MISMO cliente OAuth de Google Cloud que ya
-        configuramos para affiliate-portal — solo hay que agregarle
-        una Authorized redirect URI nueva:
-        https://<tu-proyecto-nuevo>.supabase.co/auth/v1/callback
-      - Luego en Supabase: Authentication > Providers > Google,
-        pegar el mismo Client ID / Client Secret, activar
-
-=====================================================
-3. PROBAR LOCAL
-=====================================================
-[x] Probado local: signup, login, y roster real de Bernardo (43
-    clientes, matemática de meses pagados correcta)
-
-=====================================================
-4. GITHUB — repo nuevo
-=====================================================
-[x] Repo creado: F4LA/coach-portal
-[x] Primer push hecho
-
-=====================================================
-5. VERCEL — deploy
-=====================================================
-[x] Proyecto conectado al repo
-[x] Variables de entorno agregadas
-[x] Deploy confirmado
-
-=====================================================
-6. DOMINIO
-=====================================================
-[x] Subdominio conectado: coachportal.strongstandard.com
-[x] Confirmado en vivo — signup/login/roster probados en producción
-    (43 clientes de Bernardo, datos correctos)
-[ ] Falta el paso 2 de arriba (Supabase Auth > URL Configuration) para
-    que reset password y Google login redirijan bien
+[ ] Pásame el email real de cada coach (el de la empresa):
+      Bernardo: bernardo@strongstandard.com  (ejemplo, confírmalo)
+      Brent:    ?
+      Ceci:     ?
+      Jackie:   jackie@strongstandard.com (ejemplo, confírmalo)
+      Joey:     ?
+      Miguel:   miguel@strongstandard.com (ejemplo, confírmalo)
+    Yo creo cada cuenta directo en Supabase (email + contraseña
+    temporal, o dejan que usen "Continue with Google" con ese mismo
+    correo — ambos funcionan). Nadie más puede crear una cuenta con
+    ese nombre.
 
 =====================================================
 PENDIENTE DE DECIDIR
 =====================================================
-[ ] ¿Login con Google también para coach-portal, o solo email/password
-    por ahora? (ya está construido, solo falta activarlo en Supabase)
 [ ] ¿Vista de admin para ver el roster de TODOS los coaches juntos?
     (la tabla "coach" ya tiene un campo is_admin listo para esto,
     pero no hay pantalla construida todavía)
