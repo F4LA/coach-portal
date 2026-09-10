@@ -19,6 +19,9 @@ const MONTHLY_PRODUCTS = new Set(["accountability track", "strategy track"]);
 // Retention Commission only applies to resigns sold from this date forward.
 const RETENTION_CUTOFF = new Date(2025, 6, 1); // July 1, 2025
 
+// Company owners don't get a base salary and don't earn Retention Commission.
+const OWNERS_NO_RETENTION = new Set(["bernardo", "joey"]);
+
 // Minimal quoted-CSV parser — handles commas inside quoted money fields.
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -171,9 +174,13 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
   const tierValue = parseFloat(tier);
   const newOrResign: "New" | "Resign" = row[idx.iNewOrResign]?.trim() === "Resign" ? "Resign" : "New";
 
+  const coachName = row[idx.iCoach]?.trim() ?? "";
   const datePurchased = parseDate(row[idx.iDatePurchased]);
   const isRetentionEligible =
-    newOrResign === "Resign" && !!datePurchased && datePurchased.getTime() >= RETENTION_CUTOFF.getTime();
+    newOrResign === "Resign" &&
+    !!datePurchased &&
+    datePurchased.getTime() >= RETENTION_CUTOFF.getTime() &&
+    !OWNERS_NO_RETENTION.has(coachName.toLowerCase());
 
   // Matches the real payroll tool's Active Clients filter: refunded, not
   // qualified, or missing a tier means this client never generates Coach Pay.
@@ -201,7 +208,7 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
   }
 
   return {
-    coachName: row[idx.iCoach]?.trim() ?? "",
+    coachName,
     clientName: `${firstName} ${lastName}`.trim(),
     email: row[idx.iEmail]?.trim() ?? "",
     product,

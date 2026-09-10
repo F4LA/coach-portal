@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fmtMoney } from "@/lib/coach";
 import type { CoachClient } from "@/lib/mastersheet";
+import { thisAndNextPayout } from "@/lib/payroll";
 
 function fmtDate(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -135,6 +136,7 @@ export function RosterScreen() {
   const [sortBy, setSortBy] = useState<SortKey>("end-asc");
   const [onlyPending, setOnlyPending] = useState(false);
   const [showRefunds, setShowRefunds] = useState(false);
+  const [baseSalaryCents, setBaseSalaryCents] = useState(0);
 
   useEffect(() => {
     setClients(null);
@@ -147,6 +149,7 @@ export function RosterScreen() {
         setClients(body.clients);
         setIsAdmin(body.isAdmin);
         if (body.coachNames) setCoachNames(body.coachNames);
+        setBaseSalaryCents(body.baseSalaryCents ?? 0);
       })
       .catch((e) => setError(e.message));
   }, [viewAs]);
@@ -170,12 +173,15 @@ export function RosterScreen() {
   const totals = useMemo(() => {
     const list = (clients ?? []).filter((c) => !c.isRefunded);
     const active = list.filter((c) => c.payoutMonths.some((m) => !m.paid));
+    // Same "next payout" figure the Payouts tab shows, so the two screens
+    // never disagree on what a coach is currently earning per month.
+    const { nextMonth } = thisAndNextPayout(clients ?? []);
     return {
       totalClients: list.length,
       activeClients: active.length,
-      monthlyRunRateCents: active.reduce((sum, c) => sum + c.coachPayCents + c.retentionCents, 0),
+      monthlyRunRateCents: (nextMonth?.clientCents ?? 0) + baseSalaryCents,
     };
-  }, [clients]);
+  }, [clients, baseSalaryCents]);
 
   if (error) return <p style={{ color: "var(--warning)" }}>{error}</p>;
 
@@ -208,7 +214,7 @@ export function RosterScreen() {
               <div style={{ fontFamily: "var(--font-display)", fontSize: 34, color: "var(--fg-1)", marginTop: 8 }}>
                 {fmtMoney(totals.monthlyRunRateCents)}
               </div>
-              <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 4 }}>from clients still active</div>
+              <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 4 }}>next payout, incl. base salary</div>
             </div>
             <div className="card" style={{ padding: 22 }}>
               <div className="label" style={{ color: "var(--fg-4)" }}>ACTIVE CLIENTS</div>
