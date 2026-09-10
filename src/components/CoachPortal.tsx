@@ -6,11 +6,12 @@ import { NoAccessScreen } from "./NoAccessScreen";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { RosterScreen } from "./screens/RosterScreen";
+import { PayoutsScreen } from "./screens/PayoutsScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { createClient } from "@/lib/supabase/client";
 import type { Coach } from "@/lib/coach";
 
-export type Screen = "roster" | "settings";
+export type Screen = "roster" | "payouts" | "settings";
 
 export function CoachPortal() {
   const [checkingSession, setCheckingSession] = useState(true);
@@ -113,6 +114,7 @@ export function CoachPortal() {
         <Header screen={screen} />
         <div style={{ padding: "clamp(28px, 3.5vw, 44px) clamp(24px, 4vw, 48px) 0" }}>
           {screen === "roster" && <RosterScreen />}
+          {screen === "payouts" && <PayoutsScreen />}
           {screen === "settings" && <SettingsScreen coach={coach} />}
         </div>
       </main>

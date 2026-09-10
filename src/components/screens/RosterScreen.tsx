@@ -69,7 +69,6 @@ function ClientRow({ client, showCoach }: { client: CoachClient; showCoach: bool
       {open && (
         <div style={{ padding: "0 22px 20px", borderTop: "1px solid var(--steel-a-08)" }}>
           <div style={{ display: "flex", gap: 24, marginTop: 16, flexWrap: "wrap", fontSize: 13, color: "var(--fg-3)" }}>
-            <div><span className="label" style={{ color: "var(--fg-4)" }}>PACKAGE</span> {fmtMoney(client.packageCents)}</div>
             <div><span className="label" style={{ color: "var(--fg-4)" }}>EMAIL</span> {client.email}</div>
             {client.isRefunded && client.refundDate && (
               <div style={{ color: "var(--warning)" }}>
@@ -78,9 +77,9 @@ function ClientRow({ client, showCoach }: { client: CoachClient; showCoach: bool
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10, marginTop: 16 }}>
-            {client.payoutMonths.map((m, i) => (
+            {client.payoutMonths.map((m) => (
               <div
-                key={i}
+                key={m.key}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -106,6 +105,15 @@ function ClientRow({ client, showCoach }: { client: CoachClient; showCoach: bool
 
 const ALL_COACHES = "__all__";
 
+type SortKey = "name-asc" | "name-desc" | "end-asc" | "end-desc";
+
+const SORTERS: Record<SortKey, (a: CoachClient, b: CoachClient) => number> = {
+  "name-asc": (a, b) => a.clientName.localeCompare(b.clientName),
+  "name-desc": (a, b) => b.clientName.localeCompare(a.clientName),
+  "end-asc": (a, b) => (a.contractEnd < b.contractEnd ? -1 : a.contractEnd > b.contractEnd ? 1 : 0),
+  "end-desc": (a, b) => (a.contractEnd > b.contractEnd ? -1 : a.contractEnd < b.contractEnd ? 1 : 0),
+};
+
 export function RosterScreen() {
   const [clients, setClients] = useState<CoachClient[] | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -113,6 +121,8 @@ export function RosterScreen() {
   const [viewAs, setViewAs] = useState(ALL_COACHES);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("end-asc");
+  const [onlyPending, setOnlyPending] = useState(false);
 
   useEffect(() => {
     setClients(null);
@@ -132,9 +142,15 @@ export function RosterScreen() {
   const filtered = useMemo(() => {
     if (!clients) return [];
     const q = query.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter((c) => c.clientName.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-  }, [clients, query]);
+    let list = clients;
+    if (q) {
+      list = list.filter((c) => c.clientName.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+    }
+    if (onlyPending) {
+      list = list.filter((c) => c.payoutMonths.some((m) => !m.paid));
+    }
+    return [...list].sort(SORTERS[sortBy]);
+  }, [clients, query, onlyPending, sortBy]);
 
   const totals = useMemo(() => {
     const list = clients ?? [];
@@ -142,7 +158,6 @@ export function RosterScreen() {
     return {
       totalClients: list.length,
       activeClients: active.length,
-      totalPaidCents: list.reduce((sum, c) => sum + c.totalPaidSoFarCents, 0),
       monthlyRunRateCents: active.reduce((sum, c) => sum + c.coachPayCents, 0),
     };
   }, [clients]);
@@ -174,14 +189,8 @@ export function RosterScreen() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
             <div className="card-featured" style={{ padding: 22 }}>
-              <div className="label" style={{ color: "var(--fg-3)" }}>PAID TO DATE</div>
+              <div className="label" style={{ color: "var(--fg-3)" }}>MONTHLY RUN RATE</div>
               <div style={{ fontFamily: "var(--font-display)", fontSize: 34, color: "var(--fg-1)", marginTop: 8 }}>
-                {fmtMoney(totals.totalPaidCents)}
-              </div>
-            </div>
-            <div className="card" style={{ padding: 22 }}>
-              <div className="label" style={{ color: "var(--fg-4)" }}>MONTHLY RUN RATE</div>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
                 {fmtMoney(totals.monthlyRunRateCents)}
               </div>
               <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 4 }}>from clients still active</div>
@@ -200,13 +209,30 @@ export function RosterScreen() {
             </div>
           </div>
 
-          <input
-            className="field"
-            placeholder="Search by name or email…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ maxWidth: 340, padding: "11px 16px" }}
-          />
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              className="field"
+              placeholder="Search by name or email…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              style={{ maxWidth: 340, padding: "11px 16px" }}
+            />
+            <select
+              className="field"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              style={{ maxWidth: 220, padding: "11px 14px" }}
+            >
+              <option value="name-asc">Name (A–Z)</option>
+              <option value="name-desc">Name (Z–A)</option>
+              <option value="end-asc">End date (soonest)</option>
+              <option value="end-desc">End date (latest)</option>
+            </select>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--fg-3)", cursor: "pointer" }}>
+              <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} />
+              Only clients still owed payments
+            </label>
+          </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filtered.length === 0 ? (

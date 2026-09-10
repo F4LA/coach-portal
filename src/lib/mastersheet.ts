@@ -92,6 +92,7 @@ function columnIndex(header: string[]) {
 }
 
 export type PayoutMonth = {
+  key: string; // "2026-08", for grouping/sorting across clients
   label: string; // "August 2026"
   paid: boolean; // true once that payroll month has arrived
 };
@@ -131,7 +132,8 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
     const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
     const ym = d.getFullYear() * 12 + d.getMonth();
     const paid = ym <= nowYM;
-    payoutMonths.push({ label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), paid });
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    payoutMonths.push({ key, label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), paid });
     totalScheduledCents += coachPayCents;
     if (paid) totalPaidSoFarCents += coachPayCents;
   }

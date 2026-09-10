@@ -6,6 +6,8 @@ function metaFor(screen: Screen): { crumb: string; title: string } {
   switch (screen) {
     case "roster":
       return { crumb: "CLIENTS", title: "Your roster" };
+    case "payouts":
+      return { crumb: "PAYMENTS", title: "Payouts" };
     case "settings":
       return { crumb: "ACCOUNT", title: "Settings" };
   }

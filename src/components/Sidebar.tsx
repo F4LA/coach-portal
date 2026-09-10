@@ -11,6 +11,14 @@ function RosterIcon() {
     </svg>
   );
 }
+function PayoutsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function SettingsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -22,6 +30,7 @@ function SettingsIcon() {
 
 const NAV_ITEMS: { id: Screen; label: string; icon: React.ReactNode }[] = [
   { id: "roster", label: "Client Roster", icon: <RosterIcon /> },
+  { id: "payouts", label: "Payouts", icon: <PayoutsIcon /> },
 ];
 const SETTINGS_ITEM = { id: "settings" as const, label: "Settings", icon: <SettingsIcon /> };
 

@@ -5,6 +5,7 @@ export type Coach = {
   isAdmin: boolean;
 };
 
-const fmtMoney = (cents: number) => `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// All payments in this business are whole dollars — never show cents.
+const fmtMoney = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`;
 
 export { fmtMoney };
