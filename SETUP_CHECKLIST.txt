@@ -1,0 +1,65 @@
+COACH PORTAL — CHECKLIST DE ARRANQUE
+Proyecto separado de affiliate-portal: Supabase propio, repo propio, dominio propio.
+
+=====================================================
+1. SUPABASE — proyecto nuevo
+=====================================================
+[x] Crear un proyecto NUEVO en supabase.com — se llama "coach-portal"
+[x] Copiar Project URL, anon key, service_role key a .env.local
+[x] Correr supabase/schema.sql (tabla "coach" creada y confirmada)
+
+=====================================================
+2. SUPABASE AUTH — configuración
+=====================================================
+[ ] Authentication > URL Configuration:
+      - Site URL: http://localhost:3458 (por ahora, mientras probamos local)
+      - Redirect URLs: agregar http://localhost:3458/**
+    (cuando tengamos el dominio final, actualizamos esto a
+    https://coaches.strongstandard.com)
+[ ] Google login (opcional, pero ya lo tiene affiliate-portal):
+      - Puedes reusar el MISMO cliente OAuth de Google Cloud que ya
+        configuramos para affiliate-portal — solo hay que agregarle
+        una Authorized redirect URI nueva:
+        https://<tu-proyecto-nuevo>.supabase.co/auth/v1/callback
+      - Luego en Supabase: Authentication > Providers > Google,
+        pegar el mismo Client ID / Client Secret, activar
+
+=====================================================
+3. PROBAR LOCAL
+=====================================================
+[x] Probado local: signup, login, y roster real de Bernardo (43
+    clientes, matemática de meses pagados correcta)
+
+=====================================================
+4. GITHUB — repo nuevo
+=====================================================
+[ ] Crear repo NUEVO en GitHub (ej. F4LA/coach-portal) — separado de
+    affiliate-portal
+[ ] Yo hago el primer push una vez lo crees y me confirmes el nombre
+
+=====================================================
+5. VERCEL — deploy
+=====================================================
+[ ] Crear proyecto NUEVO en Vercel, conectado a ese repo
+[ ] Agregar las mismas 3 variables de entorno del paso 1 (Project
+    Settings > Environment Variables)
+[ ] Confirmar el primer deploy
+
+=====================================================
+6. DOMINIO
+=====================================================
+[ ] Decidir subdominio (ej. coaches.strongstandard.com)
+[ ] Agregar el dominio en Vercel (Project > Domains)
+[ ] Agregar el registro DNS que te dé Vercel (donde manejes el DNS de
+    strongstandard.com)
+[ ] Una vez el dominio esté vivo, actualizar Supabase Auth > URL
+    Configuration con la URL final (Site URL + Redirect URLs)
+
+=====================================================
+PENDIENTE DE DECIDIR
+=====================================================
+[ ] ¿Login con Google también para coach-portal, o solo email/password
+    por ahora? (ya está construido, solo falta activarlo en Supabase)
+[ ] ¿Vista de admin para ver el roster de TODOS los coaches juntos?
+    (la tabla "coach" ya tiene un campo is_admin listo para esto,
+    pero no hay pantalla construida todavía)
