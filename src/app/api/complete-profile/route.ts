@@ -34,6 +34,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You already have a coach profile." }, { status: 409 });
   }
 
+  const { data: existingCoach } = await admin.from("coach").select("id").ilike("name", match).maybeSingle();
+  if (existingCoach) {
+    return NextResponse.json(
+      { error: `An account for ${match} already exists. If that's you, sign in instead — otherwise contact an admin.` },
+      { status: 409 }
+    );
+  }
+
   const { error } = await admin.from("coach").insert({ id: user.id, name: match });
   if (error) {
     return NextResponse.json({ error: "Couldn't create your coach profile." }, { status: 500 });

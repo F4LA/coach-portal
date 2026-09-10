@@ -23,6 +23,18 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
+  const { data: existingCoach } = await admin
+    .from("coach")
+    .select("id")
+    .ilike("name", match)
+    .maybeSingle();
+  if (existingCoach) {
+    return NextResponse.json(
+      { error: `An account for ${match} already exists. If that's you, sign in instead — otherwise contact an admin.` },
+      { status: 409 }
+    );
+  }
+
   const { data: userData, error: userError } = await admin.auth.admin.createUser({
     email,
     password,
