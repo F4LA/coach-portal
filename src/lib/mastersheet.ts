@@ -1,9 +1,23 @@
 // Reads the Client Mastersheet Google Sheet directly instead of duplicating
 // client data into our own database — same approach as the affiliate portal's
 // sheet.ts. Server-only: not CORS-enabled for browser use.
+//
+// The month-by-month qualification logic here is ported from the real
+// payroll tool (Strong Standard Payroll Portal) so the numbers a coach sees
+// here match what actually gets paid: it uses raw "Contract End" (not "New
+// End Date"), evaluates one calendar month at a time, and excludes refunded
+// clients entirely from Coach Pay — matching that tool's Active Clients /
+// Retention Commission filters exactly.
 
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/1ctM6K8hQfh73bi7f-MtXkqW3BaPxU73NZf8xPJQUEOc/export?format=csv&gid=0";
+
+// Month-to-month services — checked inclusively against the period's last
+// day, unlike the fixed-term "1:1 Coaching" contracts below.
+const MONTHLY_PRODUCTS = new Set(["accountability track", "strategy track"]);
+
+// Retention Commission only applies to resigns sold from this date forward.
+const RETENTION_CUTOFF = new Date(2025, 6, 1); // July 1, 2025
 
 // Minimal quoted-CSV parser — handles commas inside quoted money fields.
 function parseCsv(text: string): string[][] {
@@ -59,10 +73,6 @@ function parseDate(s: string | undefined): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function addMonths(d: Date, months: number): Date {
-  return new Date(d.getFullYear(), d.getMonth() + months, d.getDate());
-}
-
 function isoDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -78,14 +88,16 @@ function columnIndex(header: string[]) {
     iEmail: col("Email Address"),
     iProduct: col("Product"),
     iPackage: col("$ Package"),
+    iDatePurchased: col("Date Purchased"),
     iStart: col("Contract Start"),
     iEnd: col("Contract End"),
-    iNewEnd: col("New End Date"),
     iDuration: col("Coaching Duration"),
     iCoach: col("Coach"),
     iTier: col("Tier"),
     iCoachPay: col("Coach Pay"),
     iNewOrResign: col("New or Resign"),
+    iRetentionComm: col("Retention Commission"),
+    iNotQualified: col("Not Qualified for Commission"),
     iRefundFlag: col("14 Days Refund?"),
     iRefundDate: col("Refund Date"),
   };
@@ -104,57 +116,98 @@ export type CoachClient = {
   product: string;
   packageCents: number;
   contractStart: string; // ISO date
-  contractEnd: string; // ISO date — "New End Date" when set, else "Contract End"
+  contractEnd: string; // ISO date — raw "Contract End", same field payroll uses
   durationMonths: number;
   tier: string;
-  coachPayCents: number; // flat rate paid per payroll month
+  coachPayCents: number; // flat rate per qualifying month — 0 if refunded/non-qualified/no tier
+  retentionCents: number; // extra per qualifying month for eligible resigns — 0 otherwise
   newOrResign: "New" | "Resign";
   isRefunded: boolean;
   refundDate: string | null;
-  payoutMonths: PayoutMonth[];
-  totalScheduledCents: number;
-  totalPaidSoFarCents: number;
+  payoutMonths: PayoutMonth[]; // months this contract is considered active, per payroll's own logic
+  totalScheduledCents: number; // (coachPay + retention) across all payoutMonths
+  totalPaidSoFarCents: number; // same, but only months already past
 };
+
+// Walks forward one calendar month at a time from the contract's start month,
+// stopping as soon as a month no longer qualifies — mirrors the real payroll
+// tool's per-period "is this client still active this month" check instead of
+// trusting "Coaching Duration" to always match Start/End exactly (it doesn't,
+// for ~15% of rows).
+function computeQualifyingMonths(start: Date, contractEnd: Date, isMonthly: boolean): { year: number; month: number }[] {
+  const months: { year: number; month: number }[] = [];
+  for (let i = 0; i < 120; i++) {
+    const y = start.getFullYear();
+    const m = start.getMonth() + i;
+    const nextMonthFirst = new Date(y, m + 1, 1);
+    const lastDayOfPeriod = new Date(y, m + 1, 0);
+    const qualifies = isMonthly
+      ? contractEnd.getTime() >= lastDayOfPeriod.getTime()
+      : contractEnd.getTime() >= nextMonthFirst.getTime();
+    if (!qualifies) break;
+    months.push({ year: y, month: ((m % 12) + 12) % 12 });
+  }
+  return months;
+}
 
 function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClient | null {
   const start = parseDate(row[idx.iStart]);
+  const end = parseDate(row[idx.iEnd]);
   const duration = parseInt(row[idx.iDuration], 10);
-  if (!start || isNaN(duration) || duration <= 0) return null;
-
-  const endRaw = row[idx.iNewEnd]?.trim() || row[idx.iEnd]?.trim();
-  const end = parseDate(endRaw) ?? addMonths(start, duration);
-  const coachPayCents = parseMoneyCents(row[idx.iCoachPay]);
-
-  const payoutMonths: PayoutMonth[] = [];
-  let totalScheduledCents = 0;
-  let totalPaidSoFarCents = 0;
-  for (let i = 0; i < duration; i++) {
-    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    const ym = d.getFullYear() * 12 + d.getMonth();
-    const paid = ym <= nowYM;
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    payoutMonths.push({ key, label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), paid });
-    totalScheduledCents += coachPayCents;
-    if (paid) totalPaidSoFarCents += coachPayCents;
-  }
+  if (!start || !end) return null;
 
   const firstName = row[idx.iFirst]?.trim() ?? "";
   const lastName = row[idx.iLast]?.trim() ?? "";
   if (!firstName && !lastName) return null;
 
+  const product = row[idx.iProduct]?.trim() ?? "";
+  const isMonthly = MONTHLY_PRODUCTS.has(product.toLowerCase());
+  const isRefunded = row[idx.iRefundFlag]?.trim() === "TRUE";
+  const isNotQualified = row[idx.iNotQualified]?.trim() === "TRUE";
+  const tier = row[idx.iTier]?.trim() ?? "";
+  const tierValue = parseFloat(tier);
+  const newOrResign: "New" | "Resign" = row[idx.iNewOrResign]?.trim() === "Resign" ? "Resign" : "New";
+
+  const datePurchased = parseDate(row[idx.iDatePurchased]);
+  const isRetentionEligible =
+    newOrResign === "Resign" && !!datePurchased && datePurchased.getTime() >= RETENTION_CUTOFF.getTime();
+
+  // Matches the real payroll tool's Active Clients filter: refunded, not
+  // qualified, or missing a tier means this client never generates Coach Pay.
+  const earnsCoachPay = !isRefunded && !isNotQualified && !isNaN(tierValue) && tierValue > 0;
+
+  const qualifyingMonths = computeQualifyingMonths(start, end, isMonthly);
+  const coachPayCents = earnsCoachPay ? parseMoneyCents(row[idx.iCoachPay]) : 0;
+  const retentionCents = isRetentionEligible ? parseMoneyCents(row[idx.iRetentionComm]) : 0;
+  const monthlyCents = coachPayCents + retentionCents;
+
+  const payoutMonths: PayoutMonth[] = [];
+  let totalScheduledCents = 0;
+  let totalPaidSoFarCents = 0;
+  for (const { year, month } of qualifyingMonths) {
+    const ym = year * 12 + month;
+    const paid = ym <= nowYM;
+    const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+    const label = new Date(year, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    payoutMonths.push({ key, label, paid });
+    totalScheduledCents += monthlyCents;
+    if (paid) totalPaidSoFarCents += monthlyCents;
+  }
+
   return {
     coachName: row[idx.iCoach]?.trim() ?? "",
     clientName: `${firstName} ${lastName}`.trim(),
     email: row[idx.iEmail]?.trim() ?? "",
-    product: row[idx.iProduct]?.trim() ?? "",
+    product,
     packageCents: parseMoneyCents(row[idx.iPackage]),
     contractStart: isoDate(start),
     contractEnd: isoDate(end),
-    durationMonths: duration,
-    tier: row[idx.iTier]?.trim() ?? "",
+    durationMonths: isNaN(duration) ? qualifyingMonths.length : duration,
+    tier,
     coachPayCents,
-    newOrResign: row[idx.iNewOrResign]?.trim() === "Resign" ? "Resign" : "New",
-    isRefunded: row[idx.iRefundFlag]?.trim() === "TRUE",
+    retentionCents,
+    newOrResign,
+    isRefunded,
     refundDate: row[idx.iRefundDate]?.trim() || null,
     payoutMonths,
     totalScheduledCents,

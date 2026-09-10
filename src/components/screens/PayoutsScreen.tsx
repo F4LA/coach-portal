@@ -44,17 +44,19 @@ export function PayoutsScreen() {
   const months = useMemo(() => {
     const byKey = new Map<string, MonthTotal>();
     for (const client of clients ?? []) {
+      const monthlyCents = client.coachPayCents + client.retentionCents;
+      if (monthlyCents === 0) continue;
       for (const m of client.payoutMonths) {
         const existing = byKey.get(m.key);
         if (existing) {
-          existing.totalCents += client.coachPayCents;
+          existing.totalCents += monthlyCents;
           existing.clientCount += 1;
         } else {
           byKey.set(m.key, {
             key: m.key,
             label: monthLabelFromKey(m.key),
             paid: m.paid,
-            totalCents: client.coachPayCents,
+            totalCents: monthlyCents,
             clientCount: 1,
           });
         }
