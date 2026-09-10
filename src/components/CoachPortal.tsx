@@ -28,9 +28,9 @@ export function CoachPortal() {
       setProfileChecked(true);
       return;
     }
-    const { data } = await supabase.from("coach").select("name").eq("id", user.id).maybeSingle();
+    const { data } = await supabase.from("coach").select("name, is_admin").eq("id", user.id).maybeSingle();
     if (data) {
-      setCoach({ id: user.id, name: data.name, email: user.email ?? "", isAdmin: false });
+      setCoach({ id: user.id, name: data.name, email: user.email ?? "", isAdmin: data.is_admin });
     } else {
       setAuthedEmail(user.email ?? "");
     }

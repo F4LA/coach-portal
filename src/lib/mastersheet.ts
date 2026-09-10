@@ -97,6 +97,7 @@ export type PayoutMonth = {
 };
 
 export type CoachClient = {
+  coachName: string;
   clientName: string;
   email: string;
   product: string;
@@ -140,6 +141,7 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
   if (!firstName && !lastName) return null;
 
   return {
+    coachName: row[idx.iCoach]?.trim() ?? "",
     clientName: `${firstName} ${lastName}`.trim(),
     email: row[idx.iEmail]?.trim() ?? "",
     product: row[idx.iProduct]?.trim() ?? "",
@@ -167,15 +169,19 @@ async function fetchRows(): Promise<{ header: string[]; rows: string[][] }> {
 }
 
 export async function getClientsForCoach(coachName: string): Promise<CoachClient[]> {
+  const clients = await getAllClients();
+  const target = coachName.trim().toLowerCase();
+  return clients.filter((c) => c.coachName.toLowerCase() === target);
+}
+
+export async function getAllClients(): Promise<CoachClient[]> {
   const { header, rows } = await fetchRows();
   const idx = columnIndex(header);
   const now = new Date();
   const nowYM = now.getFullYear() * 12 + now.getMonth();
-  const target = coachName.trim().toLowerCase();
 
   const clients: CoachClient[] = [];
   for (const row of rows) {
-    if ((row[idx.iCoach] ?? "").trim().toLowerCase() !== target) continue;
     const client = rowToClient(row, idx, nowYM);
     if (client) clients.push(client);
   }

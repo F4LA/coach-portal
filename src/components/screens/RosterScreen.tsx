@@ -9,7 +9,7 @@ function fmtDate(iso: string) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function ClientRow({ client }: { client: CoachClient }) {
+function ClientRow({ client, showCoach }: { client: CoachClient; showCoach: boolean }) {
   const [open, setOpen] = useState(false);
   const monthsPaid = client.payoutMonths.filter((m) => m.paid).length;
   const isComplete = monthsPaid >= client.durationMonths;
@@ -37,6 +37,9 @@ function ClientRow({ client }: { client: CoachClient }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14, color: "var(--fg-1)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {client.clientName}
+            {showCoach && (
+              <span className="label" style={{ color: "var(--steel-400)" }}>{client.coachName.toUpperCase()}</span>
+            )}
             {client.newOrResign === "Resign" && (
               <span className="label" style={{ color: "var(--gold)" }}>RESIGN</span>
             )}
@@ -101,20 +104,30 @@ function ClientRow({ client }: { client: CoachClient }) {
   );
 }
 
+const ALL_COACHES = "__all__";
+
 export function RosterScreen() {
   const [clients, setClients] = useState<CoachClient[] | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [coachNames, setCoachNames] = useState<string[]>([]);
+  const [viewAs, setViewAs] = useState(ALL_COACHES);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    fetch("/api/roster")
+    setClients(null);
+    setError(null);
+    const qs = viewAs === ALL_COACHES ? "" : `?coach=${encodeURIComponent(viewAs)}`;
+    fetch(`/api/roster${qs}`)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || "Failed to load.");
         setClients(body.clients);
+        setIsAdmin(body.isAdmin);
+        if (body.coachNames) setCoachNames(body.coachNames);
       })
       .catch((e) => setError(e.message));
-  }, []);
+  }, [viewAs]);
 
   const filtered = useMemo(() => {
     if (!clients) return [];
@@ -135,53 +148,81 @@ export function RosterScreen() {
   }, [clients]);
 
   if (error) return <p style={{ color: "var(--warning)" }}>{error}</p>;
-  if (clients === null) return <p style={{ color: "var(--fg-4)" }}>Loading…</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-        <div className="card-featured" style={{ padding: 22 }}>
-          <div className="label" style={{ color: "var(--fg-3)" }}>PAID TO DATE</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 34, color: "var(--fg-1)", marginTop: 8 }}>
-            {fmtMoney(totals.totalPaidCents)}
-          </div>
+      {isAdmin && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div className="label" style={{ color: "var(--fg-4)" }}>VIEWING AS</div>
+          <select
+            className="field"
+            value={viewAs}
+            onChange={(e) => setViewAs(e.target.value)}
+            style={{ maxWidth: 240, padding: "9px 14px" }}
+          >
+            <option value={ALL_COACHES}>All coaches</option>
+            {coachNames.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
-        <div className="card" style={{ padding: 22 }}>
-          <div className="label" style={{ color: "var(--fg-4)" }}>MONTHLY RUN RATE</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
-            {fmtMoney(totals.monthlyRunRateCents)}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 4 }}>from clients still active</div>
-        </div>
-        <div className="card" style={{ padding: 22 }}>
-          <div className="label" style={{ color: "var(--fg-4)" }}>ACTIVE CLIENTS</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
-            {totals.activeClients}
-          </div>
-        </div>
-        <div className="card" style={{ padding: 22 }}>
-          <div className="label" style={{ color: "var(--fg-4)" }}>TOTAL CLIENTS EVER</div>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
-            {totals.totalClients}
-          </div>
-        </div>
-      </div>
+      )}
 
-      <input
-        className="field"
-        placeholder="Search by name or email…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{ maxWidth: 340, padding: "11px 16px" }}
-      />
+      {clients === null ? (
+        <p style={{ color: "var(--fg-4)" }}>Loading…</p>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+            <div className="card-featured" style={{ padding: 22 }}>
+              <div className="label" style={{ color: "var(--fg-3)" }}>PAID TO DATE</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 34, color: "var(--fg-1)", marginTop: 8 }}>
+                {fmtMoney(totals.totalPaidCents)}
+              </div>
+            </div>
+            <div className="card" style={{ padding: 22 }}>
+              <div className="label" style={{ color: "var(--fg-4)" }}>MONTHLY RUN RATE</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
+                {fmtMoney(totals.monthlyRunRateCents)}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 4 }}>from clients still active</div>
+            </div>
+            <div className="card" style={{ padding: 22 }}>
+              <div className="label" style={{ color: "var(--fg-4)" }}>ACTIVE CLIENTS</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
+                {totals.activeClients}
+              </div>
+            </div>
+            <div className="card" style={{ padding: 22 }}>
+              <div className="label" style={{ color: "var(--fg-4)" }}>TOTAL CLIENTS EVER</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--fg-1)", marginTop: 8 }}>
+                {totals.totalClients}
+              </div>
+            </div>
+          </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {filtered.length === 0 ? (
-          <p style={{ color: "var(--fg-4)" }}>No clients match.</p>
-        ) : (
-          filtered.map((c, i) => <ClientRow key={`${c.email}-${c.contractStart}-${i}`} client={c} />)
-        )}
-      </div>
+          <input
+            className="field"
+            placeholder="Search by name or email…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ maxWidth: 340, padding: "11px 16px" }}
+          />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {filtered.length === 0 ? (
+              <p style={{ color: "var(--fg-4)" }}>No clients match.</p>
+            ) : (
+              filtered.map((c, i) => (
+                <ClientRow
+                  key={`${c.email}-${c.contractStart}-${i}`}
+                  client={c}
+                  showCoach={isAdmin && viewAs === ALL_COACHES}
+                />
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
