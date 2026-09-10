@@ -137,15 +137,18 @@ export type CoachClient = {
 function computeQualifyingMonths(start: Date, contractEnd: Date, isMonthly: boolean): { year: number; month: number }[] {
   const months: { year: number; month: number }[] = [];
   for (let i = 0; i < 120; i++) {
-    const y = start.getFullYear();
-    const m = start.getMonth() + i;
-    const nextMonthFirst = new Date(y, m + 1, 1);
-    const lastDayOfPeriod = new Date(y, m + 1, 0);
+    // Build the candidate period from a Date so JS rolls the year over on its
+    // own past December — reducing "start.getMonth() + i" with a plain %12
+    // (as this used to do) silently repeats January-through-November from the
+    // wrong year for any contract running past 12 months.
+    const periodFirst = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    const nextMonthFirst = new Date(periodFirst.getFullYear(), periodFirst.getMonth() + 1, 1);
+    const lastDayOfPeriod = new Date(periodFirst.getFullYear(), periodFirst.getMonth() + 1, 0);
     const qualifies = isMonthly
       ? contractEnd.getTime() >= lastDayOfPeriod.getTime()
       : contractEnd.getTime() >= nextMonthFirst.getTime();
     if (!qualifies) break;
-    months.push({ year: y, month: ((m % 12) + 12) % 12 });
+    months.push({ year: periodFirst.getFullYear(), month: periodFirst.getMonth() });
   }
   return months;
 }
@@ -186,7 +189,10 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
   let totalPaidSoFarCents = 0;
   for (const { year, month } of qualifyingMonths) {
     const ym = year * 12 + month;
-    const paid = ym <= nowYM;
+    // Payroll runs in arrears on the 1st of the FOLLOWING month (e.g. September's
+    // coaching is disbursed via the October 1 payroll run) — so a period only
+    // counts as paid once the calendar has moved past its own month entirely.
+    const paid = ym < nowYM;
     const key = `${year}-${String(month + 1).padStart(2, "0")}`;
     const label = new Date(year, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
     payoutMonths.push({ key, label, paid });
