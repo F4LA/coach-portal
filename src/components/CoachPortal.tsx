@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoginScreen } from "./LoginScreen";
-import { CompleteProfileScreen } from "./CompleteProfileScreen";
+import { NoAccessScreen } from "./NoAccessScreen";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { RosterScreen } from "./screens/RosterScreen";
@@ -17,7 +17,7 @@ export function CoachPortal() {
   const [authed, setAuthed] = useState(false);
   const [coach, setCoach] = useState<Coach | null>(null);
   const [profileChecked, setProfileChecked] = useState(false);
-  const [pendingName, setPendingName] = useState("");
+  const [authedEmail, setAuthedEmail] = useState("");
   const [screen, setScreen] = useState<Screen>("roster");
   const supabase = useRef(createClient()).current;
 
@@ -32,8 +32,7 @@ export function CoachPortal() {
     if (data) {
       setCoach({ id: user.id, name: data.name, email: user.email ?? "", isAdmin: false });
     } else {
-      const meta = user.user_metadata as { full_name?: string; name?: string };
-      setPendingName(meta.full_name || meta.name || "");
+      setAuthedEmail(user.email ?? "");
     }
     setProfileChecked(true);
   }, [supabase]);
@@ -93,7 +92,7 @@ export function CoachPortal() {
   }
 
   if (!coach) {
-    return <CompleteProfileScreen onDone={loadCoach} />;
+    return <NoAccessScreen email={authedEmail} onSignOut={handleSignOut} />;
   }
 
   return (

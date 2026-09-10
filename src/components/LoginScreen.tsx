@@ -151,7 +151,7 @@ export function LoginScreen({
             </button>
 
             <p style={{ marginTop: 32, color: "var(--fg-4)", fontSize: 12, lineHeight: 1.6, textAlign: "center" }}>
-              Not set up yet? <a href="/signup">Create your coach account</a>
+              Not set up yet? Ask an admin to create your account.
             </p>
           </>
         )}

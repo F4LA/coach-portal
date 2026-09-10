@@ -11,11 +11,10 @@ Proyecto separado de affiliate-portal: Supabase propio, repo propio, dominio pro
 =====================================================
 2. SUPABASE AUTH — configuración
 =====================================================
-[ ] Authentication > URL Configuration:
-      - Site URL: http://localhost:3458 (por ahora, mientras probamos local)
-      - Redirect URLs: agregar http://localhost:3458/**
-    (cuando tengamos el dominio final, actualizamos esto a
-    https://coaches.strongstandard.com)
+[x] Authentication > URL Configuration — hecho vía API con el
+    Personal Access Token:
+      - Site URL: https://coachportal.strongstandard.com
+      - Redirect URLs: https://coachportal.strongstandard.com/**
 [ ] Google login (opcional, pero ya lo tiene affiliate-portal):
       - Puedes reusar el MISMO cliente OAuth de Google Cloud que ya
         configuramos para affiliate-portal — solo hay que agregarle
@@ -33,27 +32,24 @@ Proyecto separado de affiliate-portal: Supabase propio, repo propio, dominio pro
 =====================================================
 4. GITHUB — repo nuevo
 =====================================================
-[ ] Crear repo NUEVO en GitHub (ej. F4LA/coach-portal) — separado de
-    affiliate-portal
-[ ] Yo hago el primer push una vez lo crees y me confirmes el nombre
+[x] Repo creado: F4LA/coach-portal
+[x] Primer push hecho
 
 =====================================================
 5. VERCEL — deploy
 =====================================================
-[ ] Crear proyecto NUEVO en Vercel, conectado a ese repo
-[ ] Agregar las mismas 3 variables de entorno del paso 1 (Project
-    Settings > Environment Variables)
-[ ] Confirmar el primer deploy
+[x] Proyecto conectado al repo
+[x] Variables de entorno agregadas
+[x] Deploy confirmado
 
 =====================================================
 6. DOMINIO
 =====================================================
-[ ] Decidir subdominio (ej. coaches.strongstandard.com)
-[ ] Agregar el dominio en Vercel (Project > Domains)
-[ ] Agregar el registro DNS que te dé Vercel (donde manejes el DNS de
-    strongstandard.com)
-[ ] Una vez el dominio esté vivo, actualizar Supabase Auth > URL
-    Configuration con la URL final (Site URL + Redirect URLs)
+[x] Subdominio conectado: coachportal.strongstandard.com
+[x] Confirmado en vivo — signup/login/roster probados en producción
+    (43 clientes de Bernardo, datos correctos)
+[ ] Falta el paso 2 de arriba (Supabase Auth > URL Configuration) para
+    que reset password y Google login redirijan bien
 
 =====================================================
 PENDIENTE DE DECIDIR
