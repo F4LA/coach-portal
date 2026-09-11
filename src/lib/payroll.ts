@@ -74,3 +74,40 @@ export function thisAndNextPayout(clients: CoachClient[]) {
     nextMonth: months.find((m) => m.payKey === nextKey),
   };
 }
+
+export type UpcomingPayout = {
+  payKey: string;
+  payLabel: string;
+  periodLabel: string;
+  clientCents: number;
+  clientCount: number;
+};
+
+// A pay month's coaching period is always the month right before it.
+function periodLabelForPayKey(payKey: string): string {
+  const [y, m] = payKey.split("-").map(Number); // m is 1-indexed pay month
+  return new Date(y, m - 2, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+// The next `count` upcoming payouts, starting the month after the current
+// one — a coach's requested "see my next 3 paychecks" preview. Included even
+// for months with no client coaching pay yet lined up, since base salary
+// (added by the caller) still lands every month regardless.
+export function nextPayouts(clients: CoachClient[], count: number): UpcomingPayout[] {
+  const months = computePayoutMonths(clients);
+  const now = new Date();
+  const result: UpcomingPayout[] = [];
+  for (let i = 1; i <= count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const payKey = monthKeyFor(d);
+    const match = months.find((m) => m.payKey === payKey);
+    result.push({
+      payKey,
+      payLabel: monthLabelFromKey(payKey),
+      periodLabel: match?.periodLabel ?? periodLabelForPayKey(payKey),
+      clientCents: match?.clientCents ?? 0,
+      clientCount: match?.clientCount ?? 0,
+    });
+  }
+  return result;
+}
