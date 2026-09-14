@@ -8,6 +8,8 @@ function metaFor(screen: Screen): { crumb: string; title: string } {
       return { crumb: "CLIENTS", title: "Your roster" };
     case "payouts":
       return { crumb: "PAYMENTS", title: "Payouts" };
+    case "retention":
+      return { crumb: "CLIENTS", title: "Retention" };
     case "settings":
       return { crumb: "ACCOUNT", title: "Settings" };
   }

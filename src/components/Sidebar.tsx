@@ -19,6 +19,15 @@ function PayoutsIcon() {
     </svg>
   );
 }
+function RetentionIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function SettingsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -31,6 +40,7 @@ function SettingsIcon() {
 const NAV_ITEMS: { id: Screen; label: string; icon: React.ReactNode }[] = [
   { id: "roster", label: "Client Roster", icon: <RosterIcon /> },
   { id: "payouts", label: "Payouts", icon: <PayoutsIcon /> },
+  { id: "retention", label: "Retention", icon: <RetentionIcon /> },
 ];
 const SETTINGS_ITEM = { id: "settings" as const, label: "Settings", icon: <SettingsIcon /> };
 

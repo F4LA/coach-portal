@@ -115,6 +115,8 @@ export type PayoutMonth = {
 export type CoachClient = {
   coachName: string;
   clientName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   product: string;
   packageCents: number;
@@ -210,6 +212,8 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
   return {
     coachName,
     clientName: `${firstName} ${lastName}`.trim(),
+    firstName,
+    lastName,
     email: row[idx.iEmail]?.trim() ?? "",
     product,
     packageCents: parseMoneyCents(row[idx.iPackage]),
