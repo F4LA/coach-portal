@@ -10,6 +10,7 @@ import { PayoutsScreen } from "./screens/PayoutsScreen";
 import { RetentionScreen } from "./screens/RetentionScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { createClient } from "@/lib/supabase/client";
+import { canLeaveCurrentScreen } from "@/lib/navGuard";
 import type { Coach } from "@/lib/coach";
 
 export type Screen = "roster" | "payouts" | "retention" | "settings";
@@ -109,7 +110,15 @@ export function CoachPortal() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      <Sidebar coach={coach} active={screen} onNavigate={setScreen} onSignOut={handleSignOut} />
+      <Sidebar
+        coach={coach}
+        active={screen}
+        onNavigate={(next) => {
+          if (!canLeaveCurrentScreen()) return;
+          setScreen(next);
+        }}
+        onSignOut={handleSignOut}
+      />
 
       <main style={{ minWidth: 0, padding: "0 0 80px" }}>
         <Header screen={screen} />
