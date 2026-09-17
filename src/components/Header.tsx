@@ -10,6 +10,8 @@ function metaFor(screen: Screen): { crumb: string; title: string } {
       return { crumb: "PAYMENTS", title: "Payouts" };
     case "retention":
       return { crumb: "CLIENTS", title: "Retention" };
+    case "form-tracker":
+      return { crumb: "CLIENTS", title: "Weekly Form Tracker" };
     case "settings":
       return { crumb: "ACCOUNT", title: "Settings" };
   }

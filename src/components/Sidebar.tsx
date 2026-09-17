@@ -28,6 +28,14 @@ function RetentionIcon() {
     </svg>
   );
 }
+function FormTrackerIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M9 11l3 3L22 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function SettingsIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -41,6 +49,7 @@ const NAV_ITEMS: { id: Screen; label: string; icon: React.ReactNode }[] = [
   { id: "roster", label: "Client Roster", icon: <RosterIcon /> },
   { id: "payouts", label: "Payouts", icon: <PayoutsIcon /> },
   { id: "retention", label: "Retention", icon: <RetentionIcon /> },
+  { id: "form-tracker", label: "Weekly Form Tracker", icon: <FormTrackerIcon /> },
 ];
 const SETTINGS_ITEM = { id: "settings" as const, label: "Settings", icon: <SettingsIcon /> };
 

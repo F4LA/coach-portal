@@ -8,12 +8,13 @@ import { Header } from "./Header";
 import { RosterScreen } from "./screens/RosterScreen";
 import { PayoutsScreen } from "./screens/PayoutsScreen";
 import { RetentionScreen } from "./screens/RetentionScreen";
+import { FormTrackerScreen } from "./screens/FormTrackerScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { createClient } from "@/lib/supabase/client";
 import { canLeaveCurrentScreen } from "@/lib/navGuard";
 import type { Coach } from "@/lib/coach";
 
-export type Screen = "roster" | "payouts" | "retention" | "settings";
+export type Screen = "roster" | "payouts" | "retention" | "form-tracker" | "settings";
 
 export function CoachPortal() {
   const [checkingSession, setCheckingSession] = useState(true);
@@ -126,6 +127,7 @@ export function CoachPortal() {
           {screen === "roster" && <RosterScreen />}
           {screen === "payouts" && <PayoutsScreen />}
           {screen === "retention" && <RetentionScreen />}
+          {screen === "form-tracker" && <FormTrackerScreen />}
           {screen === "settings" && <SettingsScreen coach={coach} />}
         </div>
       </main>
