@@ -141,30 +141,6 @@ function ContractCountBadge({ number, total }: { number: number; total: number }
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms" }}
-    >
-      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function NoteIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2">
-      <path d="M4 4h16v12H9l-5 5V4z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 const PROGRAM_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "—" },
   { value: "1on1", label: "1:1 Coaching" },
@@ -192,7 +168,6 @@ function RetentionRow({
   onDirtyChange: (key: string, dirty: boolean) => void;
   onSaved: (key: string, next: { status: RetentionStatus; program: string; notes: string }) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<RetentionStatus>(client.retentionStatus);
   const [program, setProgram] = useState(client.retentionProgram);
   const [notes, setNotes] = useState(client.retentionNotes);
@@ -254,7 +229,6 @@ function RetentionRow({
 
   const end = relativeLabel(state, client.contractStart, client.contractEnd, today);
   const outcomeStyle = statusColor(status, flagged);
-  const notePreview = client.retentionNotes ? client.retentionNotes.slice(0, 60) : "";
   const showRenewedNeedsProgram = status === "Renewed" && !program;
   const showNeedsNote = (status === "Did Not Renew - Call Done" || status === "MIA") && !notes.trim();
 
@@ -290,25 +264,6 @@ function RetentionRow({
             paddingLeft: flagged ? 24 : 18,
           }}
         >
-          <button
-            onClick={() => setOpen((o) => !o)}
-            aria-label={open ? "Hide program & notes" : "Show program & notes"}
-            style={{
-              flexShrink: 0,
-              width: 26,
-              height: 26,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "none",
-              border: "1px solid rgba(34,120,172,0.25)",
-              borderRadius: 7,
-              color: "var(--fg-3)",
-              cursor: "pointer",
-            }}
-          >
-            <ChevronIcon open={open} />
-          </button>
 
           <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--fg-1)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -322,15 +277,6 @@ function RetentionRow({
             </div>
             <div style={{ fontSize: 12, color: "var(--fg-3)", display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
               <span style={{ whiteSpace: "nowrap" }}>{programLabel(client.retentionProgram) === "—" ? client.product : programLabel(client.retentionProgram)}</span>
-              {notePreview && (
-                <>
-                  <span>·</span>
-                  <NoteIcon />
-                  <span style={{ color: "#A8B6C7", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {notePreview}{client.retentionNotes.length > 60 ? "…" : ""}
-                  </span>
-                </>
-              )}
             </div>
           </div>
 
@@ -380,8 +326,7 @@ function RetentionRow({
         </div>
       </div>
 
-      {open && (
-        <div style={{ padding: "4px 18px 16px 60px", display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ padding: "4px 18px 16px 18px", display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ width: 250, flexShrink: 0 }}>
             <div className="label" style={{ color: "var(--fg-4)", marginBottom: 6 }}>CONTINUING WITH</div>
             <select
@@ -445,8 +390,7 @@ function RetentionRow({
             {justSaved && !dirty && <div style={{ fontSize: 11, color: "var(--success)" }}>Saved</div>}
             {error && <div style={{ fontSize: 11, color: "var(--warning)" }}>{error}</div>}
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
