@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getCachedBody, setCachedBody } from "@/lib/clientCache";
 import { fmtMoney } from "@/lib/coach";
 import type { CoachClient } from "@/lib/mastersheet";
 import { nextPayouts } from "@/lib/payroll";
@@ -17,19 +18,27 @@ export function PayoutsScreen() {
   const [baseSalaryCents, setBaseSalaryCents] = useState(0);
 
   useEffect(() => {
-    setClients(null);
     setError(null);
     const qs = viewAs === ALL_COACHES ? "" : `?coach=${encodeURIComponent(viewAs)}`;
-    fetch(`/api/roster${qs}`)
+    const url = `/api/roster${qs}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apply = (body: any) => {
+      setClients(body.clients);
+      setIsAdmin(body.isAdmin);
+      if (body.coachNames) setCoachNames(body.coachNames);
+      setBaseSalaryCents(body.baseSalaryCents ?? 0);
+    };
+    const hit = getCachedBody(url);
+    if (hit) apply(hit);
+    else setClients(null);
+    fetch(url)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || "Failed to load.");
-        setClients(body.clients);
-        setIsAdmin(body.isAdmin);
-        if (body.coachNames) setCoachNames(body.coachNames);
-        setBaseSalaryCents(body.baseSalaryCents ?? 0);
+        setCachedBody(url, body);
+        apply(body);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => { if (!hit) setError(e.message); });
   }, [viewAs]);
 
   const upcoming = useMemo(() => nextPayouts(clients ?? [], UPCOMING_COUNT), [clients]);

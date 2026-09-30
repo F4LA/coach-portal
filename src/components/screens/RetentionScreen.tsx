@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import type { RetentionClient, RetentionStatus } from "@/lib/retention";
 import { RETENTION_STATUSES } from "@/lib/retention";
+import { getCachedBody, setCachedBody, patchCachedBodies } from "@/lib/clientCache";
 import { setLeaveGuard } from "@/lib/navGuard";
 
 const ALL_COACHES = "__all__";
@@ -449,6 +450,8 @@ export function RetentionScreen() {
   const [sortBy, setSortBy] = useState<SortKey>("ending-soonest");
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set());
   const [resetNonce, setResetNonce] = useState(0);
+  const dirtyRef = useRef(dirtyKeys);
+  useEffect(() => { dirtyRef.current = dirtyKeys; }, [dirtyKeys]);
 
   const today = useMemo(() => {
     const n = new Date();
@@ -456,19 +459,31 @@ export function RetentionScreen() {
   }, []);
 
   useEffect(() => {
-    setClients(null);
     setError(null);
     setDirtyKeys(new Set());
     const qs = viewAs === ALL_COACHES ? "" : `?coach=${encodeURIComponent(viewAs)}`;
-    fetch(`/api/retention${qs}`)
+    const url = `/api/retention${qs}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apply = (body: any) => {
+      setClients(body.clients);
+      setIsAdmin(body.isAdmin);
+      if (body.coachNames) setCoachNames(body.coachNames);
+    };
+    const hit = getCachedBody(url);
+    if (hit) apply(hit);
+    else setClients(null);
+    fetch(url)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || "Failed to load.");
-        setClients(body.clients);
-        setIsAdmin(body.isAdmin);
-        if (body.coachNames) setCoachNames(body.coachNames);
+        setCachedBody(url, body);
+        // Don't overwrite rows someone is mid-edit on; otherwise swap in the
+        // fresh data and remount rows so they pick up the new values.
+        if (hit && dirtyRef.current.size > 0) return;
+        apply(body);
+        if (hit) setResetNonce((n) => n + 1);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => { if (!hit) setError(e.message); });
   }, [viewAs]);
 
   const handleDirtyChange = useCallback((key: string, dirty: boolean) => {
@@ -492,6 +507,14 @@ export function RetentionScreen() {
         return { ...c, retentionStatus: next.status, retentionProgram: next.program, retentionNotes: next.notes };
       });
     });
+    patchCachedBodies<{ clients: RetentionClient[] }>("/api/retention", (body) => ({
+      ...body,
+      clients: body.clients.map((c) =>
+        `${c.email.trim().toLowerCase()}|${c.contractStart}` === key
+          ? { ...c, retentionStatus: next.status, retentionProgram: next.program, retentionNotes: next.notes }
+          : c,
+      ),
+    }));
   }, []);
 
   const confirmDiscardIfDirty = useCallback(() => {

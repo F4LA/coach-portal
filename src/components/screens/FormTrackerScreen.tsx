@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getCachedBody, setCachedBody } from "@/lib/clientCache";
 import { recentWeekKeys, weekKeyFor, weekWindowForKey } from "@/lib/weekWindow";
 import type { ClientWeekRow } from "@/lib/formTracker";
 
@@ -332,17 +333,20 @@ export function FormTrackerScreen() {
   }, []);
 
   useEffect(() => {
-    setData(null);
     setError(null);
     const qs = new URLSearchParams({ week: weekKey });
     if (viewAs !== ALL_COACHES) qs.set("coach", viewAs);
-    fetch(`/api/form-tracker?${qs.toString()}`)
+    const url = `/api/form-tracker?${qs.toString()}`;
+    const hit = getCachedBody<typeof data>(url);
+    setData(hit ?? null);
+    fetch(url)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || "Failed to load.");
+        setCachedBody(url, body);
         setData(body);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => { if (!hit) setError(e.message); });
   }, [weekKey, viewAs]);
 
   if (error) return <p style={{ color: "var(--warning)" }}>{error}</p>;

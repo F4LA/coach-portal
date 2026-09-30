@@ -5,6 +5,10 @@
 // coach) comes straight from the Master Sheet, same as the rest of the app.
 
 import type { CoachClient } from "./mastersheet";
+import { cached, invalidate } from "./serverCache";
+
+const RETENTION_ROWS_KEY = "retention-rows";
+const RETENTION_TTL_MS = 30_000;
 
 export const RETENTION_STATUSES = [
   "Renewed",
@@ -107,8 +111,10 @@ export function mergeRetention(clients: CoachClient[], rows: SheetRow[]): Retent
 }
 
 export async function getRetentionRows(): Promise<SheetRow[]> {
-  const result = await callBridge({ action: "list" });
-  return (result.rows as SheetRow[]) ?? [];
+  return cached(RETENTION_ROWS_KEY, RETENTION_TTL_MS, async () => {
+    const result = await callBridge({ action: "list" });
+    return (result.rows as SheetRow[]) ?? [];
+  });
 }
 
 export async function upsertRetention(input: {
@@ -136,4 +142,5 @@ export async function upsertRetention(input: {
       notes: input.retentionNotes,
     },
   });
+  invalidate(RETENTION_ROWS_KEY);
 }

@@ -9,6 +9,8 @@
 // clients entirely from Coach Pay — matching that tool's Active Clients /
 // Retention Commission filters exactly.
 
+import { cached } from "./serverCache";
+
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/1ctM6K8hQfh73bi7f-MtXkqW3BaPxU73NZf8xPJQUEOc/export?format=csv&gid=0";
 
@@ -232,12 +234,17 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
   };
 }
 
-async function fetchRows(): Promise<{ header: string[]; rows: string[][] }> {
-  const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("Couldn't load the mastersheet.");
-  const text = await res.text();
-  const rows = parseCsv(text);
-  return { header: rows[0], rows: rows.slice(1) };
+// Sheet edits show up in the portal within this window.
+const MASTERSHEET_TTL_MS = 60_000;
+
+function fetchRows(): Promise<{ header: string[]; rows: string[][] }> {
+  return cached("mastersheet", MASTERSHEET_TTL_MS, async () => {
+    const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Couldn't load the mastersheet.");
+    const text = await res.text();
+    const rows = parseCsv(text);
+    return { header: rows[0], rows: rows.slice(1) };
+  });
 }
 
 export async function getClientsForCoach(coachName: string): Promise<CoachClient[]> {
