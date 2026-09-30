@@ -58,8 +58,16 @@ async function callBridge(body: Record<string, unknown>): Promise<Record<string,
     body: JSON.stringify({ ...body, token }),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error("Retention sheet request failed.");
-  const json = await res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Retention sheet request failed (HTTP ${res.status}): ${text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200)}`);
+  }
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`Retention sheet returned non-JSON: ${text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200)}`);
+  }
   if (json && typeof json === "object" && "error" in json) {
     throw new Error(String((json as { error: unknown }).error));
   }

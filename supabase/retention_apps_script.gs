@@ -24,6 +24,14 @@ var MONTHS = {
 };
 
 function doPost(e) {
+  try {
+    return handlePost_(e);
+  } catch (err) {
+    return jsonResponse({ error: 'Apps Script error: ' + (err && err.message ? err.message : String(err)) });
+  }
+}
+
+function handlePost_(e) {
   var body = JSON.parse(e.postData.contents);
   var expected = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN');
   if (!expected || body.token !== expected) {
