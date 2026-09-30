@@ -71,7 +71,12 @@ export function thisAndNextPayout(clients: CoachClient[]) {
     currentKey,
     nextKey,
     thisMonth: months.find((m) => m.payKey === currentKey),
-    nextMonth: months.find((m) => m.payKey === nextKey),
+    // Headline "next payout" comes from the same slip math the Payouts tab
+    // breaks down, so Roster and Payouts always show the same number.
+    nextMonth: (() => {
+      const slip = payrollSlip(clients, nextKey);
+      return { payKey: nextKey, clientCents: slip.activeCents + slip.retentionCents };
+    })(),
   };
 }
 
@@ -110,4 +115,120 @@ export function nextPayouts(clients: CoachClient[], count: number): UpcomingPayo
     });
   }
   return result;
+}
+
+// ---------- per-period commission slip ----------
+// Line-for-line port of renderCoach() in strongstandar/tools/payroll, so the
+// breakdown a coach sees here is the same slip payroll actually pays out.
+
+export type SlipActiveRow = {
+  coachName: string;
+  clientName: string;
+  product: string;
+  contractStart: string;
+  contractEnd: string;
+  coachPayCents: number;
+};
+
+export type SlipRetentionRow = {
+  coachName: string;
+  clientName: string;
+  contractStart: string;
+  contractEnd: string;
+  commissionCents: number;
+};
+
+export type PayrollSlip = {
+  payKey: string; // "2026-10"
+  payDate: Date; // 1st of the pay month
+  periodStart: Date;
+  periodEnd: Date;
+  periodLabel: string;
+  active: SlipActiveRow[];
+  retention: SlipRetentionRow[];
+  activeCents: number;
+  retentionCents: number;
+};
+
+const MONTHLY_SLIP_PRODUCTS = new Set(["accountability track", "strategy track"]);
+const RETENTION_SALE_CUTOFF = new Date(2025, 6, 1);
+
+function localDate(iso: string | null): Date | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+export function payrollSlip(clients: CoachClient[], payKey: string): PayrollSlip {
+  const [py, pm] = payKey.split("-").map(Number); // pm is 1-indexed
+  const payDate = new Date(py, pm - 1, 1);
+  const start = new Date(py, pm - 2, 1);
+  const end = new Date(py, pm - 1, 0, 23, 59, 59);
+
+  const active: SlipActiveRow[] = [];
+  const retention: SlipRetentionRow[] = [];
+
+  for (const c of clients) {
+    const sd = localDate(c.contractStart);
+    const ed = localDate(c.contractEnd);
+    if (!sd || !ed || sd > end) continue;
+
+    const isMonthly = MONTHLY_SLIP_PRODUCTS.has(c.product.trim().toLowerCase());
+    const edEOD = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate(), 23, 59, 59);
+    const endOk = isMonthly ? edEOD >= end : ed > end;
+    if (endOk && !c.isNotQualified && c.tierValue > 0 && !c.isRefunded) {
+      active.push({
+        coachName: c.coachName,
+        clientName: c.clientName,
+        product: c.product,
+        contractStart: c.contractStart,
+        contractEnd: c.contractEnd,
+        coachPayCents: c.coachPayRawCents,
+      });
+    }
+
+    const edMinusMonth = new Date(ed.getFullYear(), ed.getMonth() - 1, ed.getDate());
+    const sale = localDate(c.datePurchased);
+    if (
+      edMinusMonth >= start &&
+      c.newOrResign === "Resign" &&
+      sale && sale >= RETENTION_SALE_CUTOFF &&
+      !c.retentionOwnerExcluded
+    ) {
+      retention.push({
+        coachName: c.coachName,
+        clientName: c.clientName,
+        contractStart: c.contractStart,
+        contractEnd: c.contractEnd,
+        commissionCents: c.retentionRawCents,
+      });
+    }
+  }
+
+  const byName = (a: { clientName: string }, b: { clientName: string }) => a.clientName.localeCompare(b.clientName);
+  active.sort(byName);
+  retention.sort(byName);
+
+  return {
+    payKey,
+    payDate,
+    periodStart: start,
+    periodEnd: end,
+    periodLabel: start.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    active,
+    retention,
+    activeCents: active.reduce((s, r) => s + r.coachPayCents, 0),
+    retentionCents: retention.reduce((s, r) => s + r.commissionCents, 0),
+  };
+}
+
+// The next `count` payroll slips, starting with next month's pay date.
+export function nextSlips(clients: CoachClient[], count: number): PayrollSlip[] {
+  const now = new Date();
+  const slips: PayrollSlip[] = [];
+  for (let i = 1; i <= count; i++) {
+    slips.push(payrollSlip(clients, monthKeyFor(new Date(now.getFullYear(), now.getMonth() + i, 1))));
+  }
+  return slips;
 }

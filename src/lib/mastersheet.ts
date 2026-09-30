@@ -132,6 +132,14 @@ export type CoachClient = {
   isRefunded: boolean;
   refundDate: string | null;
   payoutMonths: PayoutMonth[]; // months this contract is considered active, per payroll's own logic
+  // Raw sheet values the Payouts slip needs to replicate the payroll tool's
+  // own per-period filters (tools/payroll in strongstandar) exactly.
+  datePurchased: string | null; // ISO
+  tierValue: number;
+  isNotQualified: boolean;
+  coachPayRawCents: number;
+  retentionRawCents: number;
+  retentionOwnerExcluded: boolean;
   totalScheduledCents: number; // (coachPay + retention) across all payoutMonths
   totalPaidSoFarCents: number; // same, but only months already past
 };
@@ -231,6 +239,12 @@ function rowToClient(row: string[], idx: ColumnIndex, nowYM: number): CoachClien
     payoutMonths,
     totalScheduledCents,
     totalPaidSoFarCents,
+    datePurchased: datePurchased ? isoDate(datePurchased) : null,
+    tierValue: isNaN(tierValue) ? 0 : tierValue,
+    isNotQualified,
+    coachPayRawCents: parseMoneyCents(row[idx.iCoachPay]),
+    retentionRawCents: parseMoneyCents(row[idx.iRetentionComm]),
+    retentionOwnerExcluded: OWNERS_NO_RETENTION.has(coachName.toLowerCase()),
   };
 }
 
