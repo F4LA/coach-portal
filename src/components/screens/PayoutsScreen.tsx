@@ -29,7 +29,18 @@ function SectionHeader({ title, color, count, cents }: { title: string; color: s
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 18px", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", color: "var(--fg-4)", whiteSpace: "nowrap", borderBottom: "1px solid var(--steel-a-15)" };
 const td: React.CSSProperties = { padding: "11px 18px", fontSize: 13, color: "var(--fg-2)", whiteSpace: "nowrap", borderBottom: "1px solid rgba(138,155,176,0.08)" };
 
+type ActiveSort = "name-asc" | "name-desc" | "end-asc" | "end-desc";
+
+const ACTIVE_SORTERS: Record<ActiveSort, (a: PayrollSlip["active"][number], b: PayrollSlip["active"][number]) => number> = {
+  "name-asc": (a, b) => a.clientName.localeCompare(b.clientName),
+  "name-desc": (a, b) => b.clientName.localeCompare(a.clientName),
+  "end-asc": (a, b) => a.contractEnd.localeCompare(b.contractEnd) || a.clientName.localeCompare(b.clientName),
+  "end-desc": (a, b) => b.contractEnd.localeCompare(a.contractEnd) || a.clientName.localeCompare(b.clientName),
+};
+
 function SlipDetail({ slip, baseSalaryCents, showCoach }: { slip: PayrollSlip; baseSalaryCents: number; showCoach: boolean }) {
+  const [activeSort, setActiveSort] = useState<ActiveSort>("name-asc");
+  const sortedActive = useMemo(() => [...slip.active].sort(ACTIVE_SORTERS[activeSort]), [slip.active, activeSort]);
   const total = slip.activeCents + slip.retentionCents + baseSalaryCents;
   const lines = [
     { label: "Active Client Pay", cents: slip.activeCents, color: GREEN },
@@ -69,6 +80,22 @@ function SlipDetail({ slip, baseSalaryCents, showCoach }: { slip: PayrollSlip; b
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <SectionHeader title="ACTIVE CLIENTS" color={GREEN} count={slip.active.length} cents={slip.activeCents} />
+        {slip.active.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: "1px solid var(--steel-a-15)" }}>
+            <div className="label" style={{ color: "var(--fg-4)" }}>SORT BY</div>
+            <select
+              className="field"
+              value={activeSort}
+              onChange={(e) => setActiveSort(e.target.value as ActiveSort)}
+              style={{ maxWidth: 220, padding: "8px 12px" }}
+            >
+              <option value="name-asc">Name (A–Z)</option>
+              <option value="name-desc">Name (Z–A)</option>
+              <option value="end-asc">End date (soonest)</option>
+              <option value="end-desc">End date (latest)</option>
+            </select>
+          </div>
+        )}
         {slip.active.length === 0 ? (
           <div style={{ padding: 18, fontSize: 13, color: "var(--fg-4)" }}>No active clients this period</div>
         ) : (
@@ -85,7 +112,7 @@ function SlipDetail({ slip, baseSalaryCents, showCoach }: { slip: PayrollSlip; b
                 </tr>
               </thead>
               <tbody>
-                {slip.active.map((r, i) => (
+                {sortedActive.map((r, i) => (
                   <tr key={`${r.clientName}-${r.contractStart}-${i}`}>
                     <td style={{ ...td, color: "var(--fg-1)", fontWeight: 500 }}>{r.clientName}</td>
                     {showCoach && <td style={td}>{r.coachName}</td>}
@@ -216,13 +243,13 @@ export function PayoutsScreen() {
                     style={{ padding: 22, textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit", outline: isSel ? "1px solid var(--steel-400)" : "none" }}
                   >
                     <div className="label" style={{ color: isSel ? "var(--fg-3)" : "var(--fg-4)" }}>
-                      {s.payDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase()}
+                      {s.periodLabel.toUpperCase()}
                     </div>
                     <div style={{ fontFamily: "var(--font-display)", fontSize: isSel ? 34 : 28, color: "var(--fg-1)", marginTop: 8 }}>
                       {fmtMoney(s.activeCents + s.retentionCents + baseSalaryCents)}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 4 }}>
-                      {count > 0 ? `${count} client${count === 1 ? "" : "s"} · ` : ""}for {s.periodLabel} coaching
+                      {count > 0 ? `${count} client${count === 1 ? "" : "s"} · ` : ""}paid {fmtDate(s.payDate)}
                     </div>
                     <div style={{ fontSize: 11, color: isSel ? "var(--steel-400)" : "var(--fg-4)", marginTop: 10 }}>
                       {isSel ? "Showing breakdown below" : "View breakdown"}

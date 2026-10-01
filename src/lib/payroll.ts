@@ -73,9 +73,11 @@ export function thisAndNextPayout(clients: CoachClient[]) {
     thisMonth: months.find((m) => m.payKey === currentKey),
     // Headline "next payout" comes from the same slip math the Payouts tab
     // breaks down, so Roster and Payouts always show the same number.
+    // This month's pay date covers last month's coaching, matching the first
+    // card on the Payouts tab.
     nextMonth: (() => {
-      const slip = payrollSlip(clients, nextKey);
-      return { payKey: nextKey, clientCents: slip.activeCents + slip.retentionCents };
+      const slip = payrollSlip(clients, currentKey);
+      return { payKey: currentKey, clientCents: slip.activeCents + slip.retentionCents };
     })(),
   };
 }
@@ -94,15 +96,15 @@ function periodLabelForPayKey(payKey: string): string {
   return new Date(y, m - 2, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-// The next `count` upcoming payouts, starting the month after the current
-// one — a coach's requested "see my next 3 paychecks" preview. Included even
+// The next `count` upcoming payouts, starting with the current pay month
+// (which pays last month's coaching) — a coach's requested "see my next 3 paychecks" preview. Included even
 // for months with no client coaching pay yet lined up, since base salary
 // (added by the caller) still lands every month regardless.
 export function nextPayouts(clients: CoachClient[], count: number): UpcomingPayout[] {
   const months = computePayoutMonths(clients);
   const now = new Date();
   const result: UpcomingPayout[] = [];
-  for (let i = 1; i <= count; i++) {
+  for (let i = 0; i < count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     const payKey = monthKeyFor(d);
     const match = months.find((m) => m.payKey === payKey);
@@ -223,11 +225,13 @@ export function payrollSlip(clients: CoachClient[], payKey: string): PayrollSlip
   };
 }
 
-// The next `count` payroll slips, starting with next month's pay date.
+// The next `count` payroll slips, starting with THIS month's pay date.
+// Payroll runs on the 1st and pays the previous month, so in October the
+// slips are: Sep coaching (paid Oct 1), Oct (paid Nov 1), Nov (paid Dec 1).
 export function nextSlips(clients: CoachClient[], count: number): PayrollSlip[] {
   const now = new Date();
   const slips: PayrollSlip[] = [];
-  for (let i = 1; i <= count; i++) {
+  for (let i = 0; i < count; i++) {
     slips.push(payrollSlip(clients, monthKeyFor(new Date(now.getFullYear(), now.getMonth() + i, 1))));
   }
   return slips;
