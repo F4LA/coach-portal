@@ -35,8 +35,12 @@ function isUnresolved(status: RetentionStatus): boolean {
   return UNRESOLVED.has(status);
 }
 
-function needsAction(state: ContractState, status: RetentionStatus): boolean {
-  return state === "CLOSED" && isUnresolved(status);
+// Only contracts that ended on or after this date count toward "Needs action".
+// Older closed records stay visible under Closed/All but are not flagged.
+const NEEDS_ACTION_FROM = "2026-08-01";
+
+function needsAction(state: ContractState, status: RetentionStatus, end: string): boolean {
+  return state === "CLOSED" && isUnresolved(status) && end >= NEEDS_ACTION_FROM;
 }
 
 function dayDiff(a: Date, b: Date): number {
@@ -181,7 +185,7 @@ function RetentionRow({
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const state = contractState(client.contractStart, client.contractEnd, today);
-  const flagged = needsAction(state, status);
+  const flagged = needsAction(state, status, client.contractEnd);
   const rowKey = `${client.email.trim().toLowerCase()}|${client.contractStart}`;
   const dirty = status !== savedStatus || program !== savedProgram || notes !== savedNotes;
   const locked = state === "FUTURE";
@@ -576,7 +580,7 @@ export function RetentionScreen() {
       else if (state === "FUTURE") counts.future++;
       else if (state === "CLOSED") {
         counts.closed++;
-        if (isUnresolved(c.retentionStatus)) counts.needsAction++;
+        if (needsAction(state, c.retentionStatus, c.contractEnd)) counts.needsAction++;
       }
     }
     return counts;
@@ -592,7 +596,7 @@ export function RetentionScreen() {
         activeChip === "active" ? state === "ACTIVE" :
         activeChip === "closed" ? state === "CLOSED" :
         activeChip === "future" ? state === "FUTURE" :
-        state === "CLOSED" && isUnresolved(c.retentionStatus);
+        needsAction(state, c.retentionStatus, c.contractEnd);
       if (!matchesChip) return false;
       if (!q) return true;
       return c.clientName.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
