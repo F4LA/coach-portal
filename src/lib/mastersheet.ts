@@ -1,4 +1,5 @@
-// Reads the Client Mastersheet Google Sheet directly instead of duplicating
+// Reads the Client Mastersheet Google Sheet directly (privately, via the
+// ss-tools-sheets service account) instead of duplicating
 // client data into our own database — same approach as the affiliate portal's
 // sheet.ts. Server-only: not CORS-enabled for browser use.
 //
@@ -10,9 +11,11 @@
 // Retention Commission filters exactly.
 
 import { cached } from "./serverCache";
+import { getSheetRowsByGid } from "./googleSheets";
 
-const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1ctM6K8hQfh73bi7f-MtXkqW3BaPxU73NZf8xPJQUEOc/export?format=csv&gid=0";
+// The sheet is private: read through the service account (see googleSheets.ts).
+const SHEET_ID = "1ctM6K8hQfh73bi7f-MtXkqW3BaPxU73NZf8xPJQUEOc";
+const SHEET_GID = 0;
 
 // Month-to-month services — checked inclusively against the period's last
 // day, unlike the fixed-term "1:1 Coaching" contracts below.
@@ -23,48 +26,6 @@ const RETENTION_CUTOFF = new Date(2025, 6, 1); // July 1, 2025
 
 // Company owners don't get a base salary and don't earn Retention Commission.
 const OWNERS_NO_RETENTION = new Set(["bernardo", "joey"]);
-
-// Minimal quoted-CSV parser — handles commas inside quoted money fields.
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += char;
-      }
-    } else if (char === '"') {
-      inQuotes = true;
-    } else if (char === ",") {
-      row.push(field);
-      field = "";
-    } else if (char === "\n" || char === "\r") {
-      if (char === "\r" && text[i + 1] === "\n") i++;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += char;
-    }
-  }
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.some((cell) => cell.trim() !== ""));
-}
 
 function parseMoneyCents(s: string | undefined): number {
   if (!s) return 0;
@@ -253,10 +214,12 @@ const MASTERSHEET_TTL_MS = 60_000;
 
 function fetchRows(): Promise<{ header: string[]; rows: string[][] }> {
   return cached("mastersheet", MASTERSHEET_TTL_MS, async () => {
-    const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("Couldn't load the mastersheet.");
-    const text = await res.text();
-    const rows = parseCsv(text);
+    let rows: string[][];
+    try {
+      rows = await getSheetRowsByGid(SHEET_ID, SHEET_GID);
+    } catch {
+      throw new Error("Couldn't load the mastersheet.");
+    }
     return { header: rows[0], rows: rows.slice(1) };
   });
 }

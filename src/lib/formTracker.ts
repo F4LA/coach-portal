@@ -1,18 +1,18 @@
 // Weekly Form Tracker — joins the Active Client Roster sheet (denominator)
 // against the Form Responses sheet (numerator) for a given coaching week.
-// Both sheets are read the same way the Master Sheet already is: public CSV
-// export, no service account. Closed weeks are frozen into Supabase so
+// Both sheets are read the same way the Master Sheet is: privately, through
+// the ss-tools-sheets service account. Closed weeks are frozen into Supabase so
 // history and consecutive-miss detection don't depend on the live sheets
 // staying unchanged after the fact.
 
-import { parseCsv } from "./csv";
+import { getSheetRowsByGid } from "./googleSheets";
 import { createAdminClient } from "./supabase/admin";
 import { etWallClockToUtc, isWeekClosed, previousWeekKey, weekWindowForKey, type WeekWindow } from "./weekWindow";
 
-const ROSTER_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1VxxqmOVuXffLOpPvMWnSUHhyhkjIajtBeBoSV3xk1fc/export?format=csv";
-const RESPONSES_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1ugM0iOCwdaQpyDVPuJQfKRhu72NQrtC-hEjJ7PkGHoA/export?format=csv";
+// Both sheets are private: read the first tab of each through the service
+// account (see googleSheets.ts).
+const ROSTER_SHEET_ID = "1VxxqmOVuXffLOpPvMWnSUHhyhkjIajtBeBoSV3xk1fc";
+const RESPONSES_SHEET_ID = "1ugM0iOCwdaQpyDVPuJQfKRhu72NQrtC-hEjJ7PkGHoA";
 
 // Bernardo and Joey are company owners, not coaches with a client caseload —
 // same exclusion the Retention/Payouts screens already apply.
@@ -58,10 +58,12 @@ function parseUsTimestamp(raw: string | undefined): Date | null {
   return etWallClockToUtc(y, mo, d, h, mi, s, 0);
 }
 
-async function fetchCsvRows(url: string): Promise<string[][]> {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Couldn't load the sheet.");
-  return parseCsv(await res.text());
+async function fetchSheetRows(spreadsheetId: string): Promise<string[][]> {
+  try {
+    return await getSheetRowsByGid(spreadsheetId);
+  } catch {
+    throw new Error("Couldn't load the sheet.");
+  }
 }
 
 async function loadData(): Promise<{
@@ -70,8 +72,8 @@ async function loadData(): Promise<{
   unmatched: { count: number; sample: string[] };
 }> {
   const [rosterRows, responseRows] = await Promise.all([
-    fetchCsvRows(ROSTER_CSV_URL),
-    fetchCsvRows(RESPONSES_CSV_URL),
+    fetchSheetRows(ROSTER_SHEET_ID),
+    fetchSheetRows(RESPONSES_SHEET_ID),
   ]);
 
   const rHeader = rosterRows[0];
