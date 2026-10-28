@@ -16,7 +16,7 @@ const RESPONSES_SHEET_ID = "1ugM0iOCwdaQpyDVPuJQfKRhu72NQrtC-hEjJ7PkGHoA";
 
 // Bernardo and Joey are company owners, not coaches with a client caseload —
 // same exclusion the Retention/Payouts screens already apply.
-export const INCLUDED_COACHES = ["Brent", "Ceci", "Miguel", "Jackie"] as const;
+export const INCLUDED_COACHES = ["Brent", "Ceci", "Miguel", "Jackie", "Mikari"] as const;
 const INCLUDED_COACH_SET = new Set<string>(INCLUDED_COACHES);
 
 const WEEKDAYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"]);
