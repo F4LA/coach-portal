@@ -130,11 +130,16 @@ export async function POST(request: Request) {
   const asUser = !!process.env.SLACK_USER_TOKEN;
   try {
     if (asUser) {
-      const me = await slack("auth.test", { get: {} }, true);
-      const info = await slack("users.info", { get: { user: me.user_id as string } });
-      const ownerEmail = (((info.user as SlackMember)?.profile?.email) || "").toLowerCase();
-      if (!ownerEmail || ownerEmail !== auth.email) {
-        return NextResponse.json({ error: `Slips are sent from ${ownerEmail || "the Slack owner's"} account, so only they can send. You're signed in as ${auth.email}.` }, { status: 403, headers });
+      // Who may send as the token owner: SLACK_SENDER_EMAIL (their @strongstandard.com login),
+      // or, if not set, the login must match the token owner's Slack email.
+      let allowed = (process.env.SLACK_SENDER_EMAIL || "").trim().toLowerCase();
+      if (!allowed) {
+        const me = await slack("auth.test", { get: {} }, true);
+        const info = await slack("users.info", { get: { user: me.user_id as string } });
+        allowed = (((info.user as SlackMember)?.profile?.email) || "").toLowerCase();
+      }
+      if (!allowed || allowed !== auth.email) {
+        return NextResponse.json({ error: `Slips are sent from Miguel's Slack account, so only ${allowed || "the account owner"} can send. You're signed in as ${auth.email}.` }, { status: 403, headers });
       }
     }
     const im = await slack("conversations.open", { json: { users: userId } }, asUser);
