@@ -2,8 +2,11 @@
 // The page signs in with Google (Supabase), sends its access token here, and:
 //   GET  -> list of Slack members (to pick who receives each slip)
 //   POST -> uploads the slip PDF and DMs it to one member with a message
-// Only @strongstandard.com accounts. Uses SLACK_BOT_TOKEN (Vercel env var),
-// which never reaches the browser.
+// Only @strongstandard.com accounts. Tokens live only in Vercel env vars:
+//   SLACK_USER_TOKEN (xoxp-, optional): slips are sent AS that person (e.g. Miguel), so replies
+//     land in their own DMs with normal notifications. Only the Slack user who owns that token
+//     (matched by email) can send.
+//   SLACK_BOT_TOKEN (xoxb-): lists members; also sends as the bot if there's no user token.
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -47,9 +50,9 @@ async function checkUser(request: Request): Promise<{ email?: string; status?: n
 
 type SlackResp = { ok: boolean; error?: string; [k: string]: unknown };
 
-async function slack(method: string, init: { json?: unknown; form?: Record<string, string>; get?: Record<string, string> }): Promise<SlackResp> {
-  const token = process.env.SLACK_BOT_TOKEN;
-  if (!token) throw new Error("SLACK_BOT_TOKEN is not set in Vercel.");
+async function slack(method: string, init: { json?: unknown; form?: Record<string, string>; get?: Record<string, string> }, asUser = false): Promise<SlackResp> {
+  const token = asUser ? process.env.SLACK_USER_TOKEN : process.env.SLACK_BOT_TOKEN;
+  if (!token) throw new Error(`${asUser ? "SLACK_USER_TOKEN" : "SLACK_BOT_TOKEN"} is not set in Vercel.`);
   let url = `https://slack.com/api/${method}`;
   const opts: RequestInit = { headers: { Authorization: `Bearer ${token}` } };
   if (init.get) {
@@ -123,11 +126,21 @@ export async function POST(request: Request) {
   if (!pdf.length || pdf.length > MAX_PDF_BYTES) return NextResponse.json({ error: "PDF is empty or too large." }, { status: 400, headers });
   if (pdf.subarray(0, 4).toString() !== "%PDF") return NextResponse.json({ error: "File is not a PDF." }, { status: 400, headers });
 
+  // Send as the user-token owner when set; then only that person may send from the tool.
+  const asUser = !!process.env.SLACK_USER_TOKEN;
   try {
-    const im = await slack("conversations.open", { json: { users: userId } });
+    if (asUser) {
+      const me = await slack("auth.test", { get: {} }, true);
+      const info = await slack("users.info", { get: { user: me.user_id as string } });
+      const ownerEmail = (((info.user as SlackMember)?.profile?.email) || "").toLowerCase();
+      if (!ownerEmail || ownerEmail !== auth.email) {
+        return NextResponse.json({ error: `Slips are sent from ${ownerEmail || "the Slack owner's"} account, so only they can send. You're signed in as ${auth.email}.` }, { status: 403, headers });
+      }
+    }
+    const im = await slack("conversations.open", { json: { users: userId } }, asUser);
     const channelId = (im.channel as { id: string }).id;
 
-    const up = await slack("files.getUploadURLExternal", { form: { filename, length: String(pdf.length) } });
+    const up = await slack("files.getUploadURLExternal", { form: { filename, length: String(pdf.length) } }, asUser);
     const putRes = await fetch(up.upload_url as string, {
       method: "POST",
       headers: { "Content-Type": "application/pdf" },
@@ -141,8 +154,8 @@ export async function POST(request: Request) {
         channel_id: channelId,
         initial_comment: message,
       },
-    });
-    return NextResponse.json({ ok: true, sentBy: auth.email }, { headers });
+    }, asUser);
+    return NextResponse.json({ ok: true, sentBy: auth.email, sentAs: asUser ? "user" : "bot" }, { headers });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't send to Slack." }, { status: 502, headers });
   }
