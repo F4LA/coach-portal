@@ -7,7 +7,9 @@ import { createSign } from "crypto";
 
 type ServiceAccount = { client_email: string; private_key: string };
 
-let tokenCache: { token: string; expires: number } | null = null;
+const READONLY = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const READWRITE = "https://www.googleapis.com/auth/spreadsheets";
+const tokenCache: Record<string, { token: string; expires: number }> = {};
 
 function serviceAccount(): ServiceAccount {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -22,16 +24,17 @@ function serviceAccount(): ServiceAccount {
 const b64url = (input: Buffer | string) =>
   Buffer.from(input).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
 
-async function accessToken(): Promise<string> {
+async function accessToken(scope: string = READONLY): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  if (tokenCache && tokenCache.expires - 60 > now) return tokenCache.token;
+  const cached = tokenCache[scope];
+  if (cached && cached.expires - 60 > now) return cached.token;
 
   const sa = serviceAccount();
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = b64url(
     JSON.stringify({
       iss: sa.client_email,
-      scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+      scope,
       aud: "https://oauth2.googleapis.com/token",
       iat: now,
       exp: now + 3600,
@@ -52,8 +55,8 @@ async function accessToken(): Promise<string> {
   });
   const body = await res.json();
   if (!res.ok) throw new Error(`Google auth failed: ${body.error_description || body.error || res.status}`);
-  tokenCache = { token: body.access_token, expires: now + Number(body.expires_in || 3600) };
-  return tokenCache.token;
+  tokenCache[scope] = { token: body.access_token, expires: now + Number(body.expires_in || 3600) };
+  return tokenCache[scope].token;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,4 +100,47 @@ export async function getSheetRowsByGid(spreadsheetId: string, gid?: number): Pr
     while (padded.length < width) padded.push("");
     return padded;
   });
+}
+
+// ── Writes (only used by routes that allow-list their target sheet) ──
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sheetsWrite(path: string, method: "PUT" | "POST", payload: unknown): Promise<any> {
+  const token = await accessToken(READWRITE);
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `Sheets HTTP ${res.status}`);
+  return body;
+}
+
+// Fresh read with write credentials (no stale cache between read and write).
+export async function getValuesRW(spreadsheetId: string, range: string): Promise<string[][]> {
+  const token = await accessToken(READWRITE);
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `Sheets HTTP ${res.status}`);
+  return body.values || [];
+}
+
+export async function updateValues(spreadsheetId: string, range: string, values: unknown[][]) {
+  return sheetsWrite(
+    `${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    "PUT",
+    { range, majorDimension: "ROWS", values }
+  );
+}
+
+export async function appendValues(spreadsheetId: string, range: string, values: unknown[][]) {
+  return sheetsWrite(
+    `${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    "POST",
+    { range, majorDimension: "ROWS", values }
+  );
 }
